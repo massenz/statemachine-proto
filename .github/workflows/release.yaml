@@ -47,10 +47,10 @@ jobs:
 
       - name: Create release tag
         run: |
-          git tag -fa ${{ env.TAG }} -m "Rel. ${{ env.TAG }}"
+          git tag -fa golang/${{ env.TAG }} -m "Rel. ${{ env.TAG }}"
           git push --tags
 
       - uses: ncipollo/release-action@v1.10.0
         with:
-          tag: ${{ env.TAG }}
+          tag: golang/${{ env.TAG }}
           generateReleaseNotes: true
