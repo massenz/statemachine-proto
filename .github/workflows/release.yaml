@@ -49,7 +49,7 @@ jobs:
 
       - name: Create release tag
         run: |
-          git tag -fa ${{ env.TAG }} -m "Rel. ${{ eng.TAG }}"
+          git tag -fa ${{ env.TAG }} -m "Rel. ${{ env.TAG }}"
           git push --tags
 
       - uses: ncipollo/release-action@v1.10.0
