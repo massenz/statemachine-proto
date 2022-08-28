@@ -1,4 +1,8 @@
+# Copyright (c) 2022 AlertAvert.com.  All rights reserved.
+# Licensed under the Apache License, Version 2.0
+#
+# Author: Marco Massenzio (marco@alertavert.com)
+
 # Build configuration
 
-version = 0.4.1
-
+version = 0.5.0
