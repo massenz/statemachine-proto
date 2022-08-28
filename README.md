@@ -4,7 +4,7 @@ The Protobuf definitions for the statemachine API.
 
 [![Author](https://img.shields.io/badge/Author-M.%20Massenzio-green)](https://github.com/massenz)
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
-[![Release Automation](https://github.com/massenz/statemachine-proto/actions/workflows/release.yaml/badge.svg)](https://github.com/massenz/statemachine-proto/actions/workflows/release.yaml)
+[![Release](https://github.com/massenz/statemachine-proto/actions/workflows/release.yaml/badge.svg)](https://github.com/massenz/statemachine-proto/actions/workflows/release.yaml)
 
 ### Copyright & Licensing
 
