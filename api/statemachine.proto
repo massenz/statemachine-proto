@@ -1,14 +1,22 @@
 // Copyright (c) 2022 AlertAvert.com.  All rights reserved.
-// Created by M. Massenzio, 2022-03-13
+// Licensed under the Apache License, Version 2.0
+//
+// Author: Marco Massenzio (marco@alertavert.com)
 
-syntax = "proto3";
+    syntax = "proto3";
 package statemachine.v1;
 
 import "google/protobuf/timestamp.proto";
 
 // This is the Go import package; there is no correlation with the proto `import` above.
+//
+// Note that when generating the Go code, only the last part of the `go_package` is used; the
+// full import is only relevant if this proto is imported by another proto, and the full
+// `go_package` is used to generate the Go import path.
+//
 // See: https://developers.google.com/protocol-buffers/docs/reference/go-generated#package
-option go_package = "github.com/massenz/statemachine/api";
+//   and https://stackoverflow.com/questions/66321215/what-is-the-go-package-option-used-for-in-a-protocol-buffer-file
+option go_package = "github.com/massenz/statemachine-proto/golang/api";
 
 // A state-machine Transition models the successful processing of an Event, and the
 // FSM transitioning from the `from` state to the `to` state.
@@ -35,6 +43,10 @@ message Event {
   // this field are left vague by design, the meaning of the `sender` string will be
   // dependant on the type of Event sent, and the target StateMachine.
   string originator = 4;
+
+  // An optional payload, which can be any arbitrary data, and is left to the user to
+  // define the semantics of the payload.
+  string details = 5;
 }
 
 message Configuration {
@@ -86,6 +98,7 @@ message GetRequest {
 
 message PutResponse {
   string id = 1;
+  // TODO: this should be a one_of
   Configuration config = 2;
   FiniteStateMachine fsm = 3;
 }
