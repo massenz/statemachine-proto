@@ -43,6 +43,10 @@ message Event {
   // this field are left vague by design, the meaning of the `sender` string will be
   // dependant on the type of Event sent, and the target StateMachine.
   string originator = 4;
+
+  // An optional payload, which can be any arbitrary data, and is left to the user to
+  // define the semantics of the payload.
+  string details = 5;
 }
 
 message Configuration {
