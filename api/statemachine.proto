@@ -3,10 +3,11 @@
 //
 // Author: Marco Massenzio (marco@alertavert.com)
 
-    syntax = "proto3";
+syntax = "proto3";
 package statemachine.v1;
 
 import "google/protobuf/timestamp.proto";
+import "grpc/status/status.proto";
 
 // This is the Go import package; there is no correlation with the proto `import` above.
 //
@@ -70,32 +71,59 @@ message Configuration {
   string starting_state = 3;
 }
 
+// a FiniteStateMachine tracks progress across States, driven by Events, according
+// to a Configuration; each FSM can track, for example, an order being processed and shipped,
+// a build pipeline, or a more complex multi-step process, possibly with cycles, and several
+// terminal states.
+//
+// Each FSM is uniquely defined by its associated Configuration (identified by `config_id`) which
+// *should* be immutable: changing an FSM's Configuration post-creation can cause undefined results,
+// but, equally, modifying a Configuration which is being used by FSMs, will cause unpredictable
+// results.
+//
+// The FSM carries a `history` of all past Events which have led the FSM to its current `state`, so
+// that it can be replicated (and queries about it can be satisfied).
 message FiniteStateMachine {
 
-  // A config_id is the unique identifier for the `Configuration`, composed of the
-  // name and version, separated by a colon (`:`), e.g., "my_config/stable:v1.0"
+  // A config_id is the unique identifier for the `Configuration` which defines the possible `states`
+  // for an FSM, as well as the allowed `Transitions`; this *may* be composed by a combination of the
+  // name and version, but this is not required.
+  //
+  // So long as `config_id` uniquely identifies a valid (immutable) Configuration, this is sufficient.
   string config_id = 1;
 
-  // The current state for this FSM
+  // The current state for this FSM, *should* be set as the `starting_state` of the Configuration at creation.
   string state = 2;
 
   // An ordered sequence of Events, recording all FSM transitions.
   repeated Event history = 3;
 }
 
+// --------------- Service API ---------------
+
+// An `Event` for an FSM, uniquely identified by the `dest` ID
 message EventRequest {
   Event event = 1;
   string dest = 2;
 }
 
+// Used to communicate back the `event_id` for the processed Event; it will be the
+// Event's `event_id` passed in the `EventRequest` (if one was provided) or a newly
+// generated one (typically, a UUID) if none was provided.
+//
+// The `event_id` can be used to correlate the outcome of the event processing (which
+// is asynchronous).
 message EventResponse {
   string event_id = 1;
+  google.rpc.Status status = 2;
 }
 
+// Used to pass in the ID for the Configuration or FSM that is being looked up.
 message GetRequest {
   string id = 1;
 }
 
+//
 message PutResponse {
   string id = 1;
   // TODO: this should be a one_of
@@ -110,5 +138,5 @@ service StatemachineService {
   rpc GetFiniteStateMachine(GetRequest) returns (FiniteStateMachine);
   rpc PutFiniteStateMachine(FiniteStateMachine) returns (PutResponse);
 
-  rpc ConsumeEvent(EventRequest) returns (EventResponse) {}
+  rpc ConsumeEvent(EventRequest) returns (EventResponse);
 }
