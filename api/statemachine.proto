@@ -4,10 +4,9 @@
 // Author: Marco Massenzio (marco@alertavert.com)
 
 syntax = "proto3";
-package statemachine.v1;
+package statemachine.v2;
 
 import "google/protobuf/timestamp.proto";
-import "grpc/status/status.proto";
 
 // This is the Go import package; there is no correlation with the proto `import` above.
 //
@@ -107,6 +106,33 @@ message EventRequest {
   string dest = 2;
 }
 
+// An `EventOutcome` describes what happened when the Event was processed by the
+// FSM and will be returned by the server (and also posted to the notifications queue,
+// if configured).
+message EventOutcome {
+  enum StatusCode {
+    Ok = 0;
+    GenericError = 1;
+    EventNotAllowed = 2;
+    FsmNotFound = 3;
+    TransitionNotAllowed = 4;
+    InternalError = 5;
+    MissingDestination = 6;
+    ConfigurationNotFound = 7;
+  }
+
+  // The status code for the outcome of the Event processing; it will be `Ok` if the Event
+  // has been successfully processed (in which case the `details` field will be empty).
+  StatusCode code = 1;
+
+  // The ID of the FSM for which the event was processed.
+  string dest = 3;
+
+  // If anything other than `Ok` is returned, this field will contain a human-readable description
+  // of the error, if available.
+  string details = 2;
+}
+
 // Used to communicate back the `event_id` for the processed Event; it will be the
 // Event's `event_id` passed in the `EventRequest` (if one was provided) or a newly
 // generated one (typically, a UUID) if none was provided.
@@ -115,7 +141,7 @@ message EventRequest {
 // is asynchronous).
 message EventResponse {
   string event_id = 1;
-  google.rpc.Status status = 2;
+  EventOutcome outcome = 2;
 }
 
 // Used to pass in the ID for the Configuration or FSM that is being looked up.
@@ -132,11 +158,26 @@ message PutResponse {
 }
 
 service StatemachineService {
-  rpc GetConfiguration(GetRequest) returns (Configuration);
+  // Creates an immutable Configuration, which can then be used to create an FSM.
   rpc PutConfiguration(Configuration) returns (PutResponse);
 
-  rpc GetFiniteStateMachine(GetRequest) returns (FiniteStateMachine);
+  // Retrieves a Configuration by its ID.
+  rpc GetConfiguration(GetRequest) returns (Configuration);
+
+  // Creates a new FSM, using the Configuration identified by `config_id`.
+  // The FSM itself is immutable, only its `state` can be mutated by processing Events.
   rpc PutFiniteStateMachine(FiniteStateMachine) returns (PutResponse);
 
-  rpc ConsumeEvent(EventRequest) returns (EventResponse);
+  // Retrieves an FSM by its ID.
+  rpc GetFiniteStateMachine(GetRequest) returns (FiniteStateMachine);
+
+  // Process an Event for an FSM, identified by `dest`.
+  // As events are processed asynchronously, the `event_id` is returned, which can be used
+  // to correlate the outcome of the event processing.
+  // In the EventResponse, the `outcome` is unlikely to have been filled in; use the `event_id`
+  // to query the outcome of the event processing by using `GetEventOutcome`.
+  rpc ProcessEvent(EventRequest) returns (EventResponse);
+
+  // Get the outcome of an event processing, identified by the `event_id` returned by `ProcessEvent`.
+  rpc GetEventOutcome(GetRequest) returns (EventResponse);
 }

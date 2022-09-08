@@ -8,11 +8,11 @@ go-dir=golang
 $(go-dir)/api/statemachine.pb.go: api/statemachine.proto
 	@mkdir -p $(go-dir)
 	protoc --go_out=./$(go-dir) --go_opt=paths=source_relative \
-         -I thirdparty -I . api/*.proto
+         api/*.proto
 
 $(go-dir)/api/statemachine_grpc.pb.go: api/statemachine.proto
 	protoc --go-grpc_out=./$(go-dir) --go-grpc_opt=paths=source_relative \
-         -I thirdparty -I . api/*.proto
+         api/*.proto
 
 protos: $(go-dir)/api/statemachine.pb.go \
         $(go-dir)/api/statemachine_grpc.pb.go
