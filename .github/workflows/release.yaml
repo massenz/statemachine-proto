@@ -6,12 +6,12 @@
 # Upon pushing to the release branch a new tag will be created
 # in preparation for the release.
 
-name: Test Generation
+name: Release & Publish
 
 on:
   push:
     branches:
-      - test
+      - release
 env:
   AUTHOR: ${{ github.event.pusher.name }}
   EMAIL: ${{ github.event.pusher.email }}
@@ -51,7 +51,7 @@ jobs:
           git tag -fa golang/${{ env.TAG }} -m "Rel. ${{ env.TAG }}"
           git push --tags
 
-#      - uses: ncipollo/release-action@v1.10.0
-#        with:
-#          tag: golang/${{ env.TAG }}
-#          generateReleaseNotes: true
+      - uses: ncipollo/release-action@v1.10.0
+        with:
+          tag: golang/${{ env.TAG }}
+          generateReleaseNotes: true
