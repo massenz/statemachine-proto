@@ -3,8 +3,8 @@
 //
 // Author: Marco Massenzio (marco@alertavert.com)
 
-    syntax = "proto3";
-package statemachine.v1;
+syntax = "proto3";
+package statemachine.v2;
 
 import "google/protobuf/timestamp.proto";
 
@@ -70,32 +70,86 @@ message Configuration {
   string starting_state = 3;
 }
 
+// a FiniteStateMachine tracks progress across States, driven by Events, according
+// to a Configuration; each FSM can track, for example, an order being processed and shipped,
+// a build pipeline, or a more complex multi-step process, possibly with cycles, and several
+// terminal states.
+//
+// Each FSM is uniquely defined by its associated Configuration (identified by `config_id`) which
+// *should* be immutable: changing an FSM's Configuration post-creation can cause undefined results,
+// but, equally, modifying a Configuration which is being used by FSMs, will cause unpredictable
+// results.
+//
+// The FSM carries a `history` of all past Events which have led the FSM to its current `state`, so
+// that it can be replicated (and queries about it can be satisfied).
 message FiniteStateMachine {
 
-  // A config_id is the unique identifier for the `Configuration`, composed of the
-  // name and version, separated by a colon (`:`), e.g., "my_config/stable:v1.0"
+  // A config_id is the unique identifier for the `Configuration` which defines the possible `states`
+  // for an FSM, as well as the allowed `Transitions`; this *may* be composed by a combination of the
+  // name and version, but this is not required.
+  //
+  // So long as `config_id` uniquely identifies a valid (immutable) Configuration, this is sufficient.
   string config_id = 1;
 
-  // The current state for this FSM
+  // The current state for this FSM, *should* be set as the `starting_state` of the Configuration at creation.
   string state = 2;
 
   // An ordered sequence of Events, recording all FSM transitions.
   repeated Event history = 3;
 }
 
+// --------------- Service API ---------------
+
+// An `Event` for an FSM, uniquely identified by the `dest` ID
 message EventRequest {
   Event event = 1;
   string dest = 2;
 }
 
-message EventResponse {
-  string event_id = 1;
+// An `EventOutcome` describes what happened when the Event was processed by the
+// FSM and will be returned by the server (and also posted to the notifications queue,
+// if configured).
+message EventOutcome {
+  enum StatusCode {
+    Ok = 0;
+    GenericError = 1;
+    EventNotAllowed = 2;
+    FsmNotFound = 3;
+    TransitionNotAllowed = 4;
+    InternalError = 5;
+    MissingDestination = 6;
+    ConfigurationNotFound = 7;
+  }
+
+  // The status code for the outcome of the Event processing; it will be `Ok` if the Event
+  // has been successfully processed (in which case the `details` field will be empty).
+  StatusCode code = 1;
+
+  // The ID of the FSM for which the event was processed.
+  string dest = 3;
+
+  // If anything other than `Ok` is returned, this field will contain a human-readable description
+  // of the error, if available.
+  string details = 2;
 }
 
+// Used to communicate back the `event_id` for the processed Event; it will be the
+// Event's `event_id` passed in the `EventRequest` (if one was provided) or a newly
+// generated one (typically, a UUID) if none was provided.
+//
+// The `event_id` can be used to correlate the outcome of the event processing (which
+// is asynchronous).
+message EventResponse {
+  string event_id = 1;
+  EventOutcome outcome = 2;
+}
+
+// Used to pass in the ID for the Configuration or FSM that is being looked up.
 message GetRequest {
   string id = 1;
 }
 
+//
 message PutResponse {
   string id = 1;
   // TODO: this should be a one_of
@@ -104,11 +158,26 @@ message PutResponse {
 }
 
 service StatemachineService {
-  rpc GetConfiguration(GetRequest) returns (Configuration);
+  // Creates an immutable Configuration, which can then be used to create an FSM.
   rpc PutConfiguration(Configuration) returns (PutResponse);
 
-  rpc GetFiniteStateMachine(GetRequest) returns (FiniteStateMachine);
+  // Retrieves a Configuration by its ID.
+  rpc GetConfiguration(GetRequest) returns (Configuration);
+
+  // Creates a new FSM, using the Configuration identified by `config_id`.
+  // The FSM itself is immutable, only its `state` can be mutated by processing Events.
   rpc PutFiniteStateMachine(FiniteStateMachine) returns (PutResponse);
 
-  rpc ConsumeEvent(EventRequest) returns (EventResponse) {}
+  // Retrieves an FSM by its ID.
+  rpc GetFiniteStateMachine(GetRequest) returns (FiniteStateMachine);
+
+  // Process an Event for an FSM, identified by `dest`.
+  // As events are processed asynchronously, the `event_id` is returned, which can be used
+  // to correlate the outcome of the event processing.
+  // In the EventResponse, the `outcome` is unlikely to have been filled in; use the `event_id`
+  // to query the outcome of the event processing by using `GetEventOutcome`.
+  rpc ProcessEvent(EventRequest) returns (EventResponse);
+
+  // Get the outcome of an event processing, identified by the `event_id` returned by `ProcessEvent`.
+  rpc GetEventOutcome(GetRequest) returns (EventResponse);
 }

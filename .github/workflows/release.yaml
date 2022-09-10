@@ -6,7 +6,7 @@
 # Upon pushing to the release branch a new tag will be created
 # in preparation for the release.
 
-name: Release
+name: Release & Publish
 
 on:
   push:
@@ -24,7 +24,8 @@ jobs:
       - uses: arduino/setup-protoc@v1
         with:
           version: '3.19'
-      - name: Install protoc-gen & build protos
+
+      - name: Install protoc-gen & Build Protobuf
         run: |
           go install google.golang.org/protobuf/cmd/protoc-gen-go@v1.28
           go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@v1.2
