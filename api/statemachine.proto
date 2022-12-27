@@ -15,6 +15,16 @@ import "google/protobuf/wrappers.proto";
 // full import is only relevant if this proto is imported by another proto, and the full
 // `go_package` is used to generate the Go import path.
 //
+//  In the project's go.mod use:
+//    require (
+//    	github.com/massenz/statemachine-proto/golang v1beta
+//    )
+//
+// and in the go source:
+//    import (
+//      	protos "github.com/massenz/statemachine-proto/golang/api"
+//    )
+//
 // See: https://developers.google.com/protocol-buffers/docs/reference/go-generated#package
 //   and https://stackoverflow.com/questions/66321215/what-is-the-go-package-option-used-for-in-a-protocol-buffer-file
 option go_package = "github.com/massenz/statemachine-proto/golang/api";
@@ -197,6 +207,11 @@ service StatemachineService {
   // returned.
   rpc GetAllConfigurations(google.protobuf.StringValue) returns (ListResponse);
 
+  // Streams all the `Configuration` whose name matches the passed in StringValue.
+  // Use this (instead of the `GetAllConfigurations()) if you want the full contents
+  // of the configurations.
+  rpc StreamAllConfigurations(google.protobuf.StringValue) returns (stream Configuration);
+
   // Retrieves a Configuration by its ID.
   rpc GetConfiguration(google.protobuf.StringValue) returns (Configuration);
 
@@ -209,7 +224,17 @@ service StatemachineService {
 
   // Looks up all the FSMs, with the given `config_name` that are in the given `state`
   // and returns their IDs.
-  rpc GetAllFiniteStateMachinesInState(GetAllFsmRequest) returns (ListResponse);
+  rpc GetAllInState(GetAllFsmRequest) returns (ListResponse);
+
+  // Streams the full contents of the `FiniteStateMachine` that match the request,
+  // including their `id`.
+  //
+  // For this method call, the `state` may optionally be empty, all the FSMs that match
+  // the configuration name will be returned.
+  //
+  // The server may optionally choose not to implement this feature, and return an
+  // `InvalidRequest` if `state` is empty.
+  rpc StreamAllInstate(GetAllFsmRequest) returns (stream PutResponse);
 
   // Process an Event for an FSM, identified by `dest`.
   //
