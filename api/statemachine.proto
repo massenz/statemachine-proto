@@ -4,15 +4,26 @@
 // Author: Marco Massenzio (marco@alertavert.com)
 
 syntax = "proto3";
-package statemachine.v2;
+package statemachine.v1beta;
 
 import "google/protobuf/timestamp.proto";
+import "google/protobuf/wrappers.proto";
 
-// This is the Go import package; there is no correlation with the proto `import` above.
+// This is the Go import package; there is no correlation with the proto `package` above.
 //
 // Note that when generating the Go code, only the last part of the `go_package` is used; the
 // full import is only relevant if this proto is imported by another proto, and the full
 // `go_package` is used to generate the Go import path.
+//
+//  In the project's go.mod use:
+//    require (
+//    	github.com/massenz/statemachine-proto/golang v1beta
+//    )
+//
+// and in the go source:
+//    import (
+//      	protos "github.com/massenz/statemachine-proto/golang/api"
+//    )
 //
 // See: https://developers.google.com/protocol-buffers/docs/reference/go-generated#package
 //   and https://stackoverflow.com/questions/66321215/what-is-the-go-package-option-used-for-in-a-protocol-buffer-file
@@ -144,40 +155,94 @@ message EventResponse {
   EventOutcome outcome = 2;
 }
 
-// Used to pass in the ID for the Configuration or FSM that is being looked up.
-message GetRequest {
+// Request to create (or update) a `Statemachine`.
+message PutFsmRequest {
+  // The ID for the FSM if specified by the client: leave blank to let the server generate random UUID.
+  // Either way, if successful, the `id` will be returned in the `PutResponse`
   string id = 1;
+
+  // The new FSM, usually only the `config_id` is required, the rest is derived from
+  // the Configuration.
+  FiniteStateMachine fsm = 2;
 }
 
-//
+// Response from the server to confirm creation was successful, returning the ID (possibly,
+// a newly generated random UUID) and the entity being stored.
 message PutResponse {
+  // The ID of the newly created entity.
   string id = 1;
-  // TODO: this should be a one_of
-  Configuration config = 2;
-  FiniteStateMachine fsm = 3;
+
+  // The full contents of the newly created entity, can only be on of either an FSM or
+  // a Configuration, make sure to check if unsure.
+  oneof entity_response {
+    Configuration config = 2;
+    FiniteStateMachine fsm = 3;
+  }
+}
+
+// Convenience response type, to return a list of IDs
+message ListResponse {
+  repeated string ids = 1;
+}
+
+message GetAllFsmRequest {
+  google.protobuf.StringValue config = 1;
+  google.protobuf.StringValue state = 2;
 }
 
 service StatemachineService {
-  // Creates an immutable Configuration, which can then be used to create an FSM.
+  // Creates an immutable Configuration, which can then be used to create FSMs whose
+  // state transitions are defined in the configuration.
+  // `Configuration`s are immutable and cannot be modified once created: attempting
+  // to `PUT` a `Configuration` with the same `name` and `version` will cause an `AlreadyExists` error.
   rpc PutConfiguration(Configuration) returns (PutResponse);
 
+  // Retrieves all Configuration names, or versions.
+  //
+  // If the `StringValue` passed in is non-empty, the returned list will be of all
+  // the fully qualified (`name:version`) configurations available on this server, where
+  // the `Configuration.name` matches the value.
+  //
+  // If the value is empty, all the `Configuration` names (without the `version`) will be
+  // returned.
+  rpc GetAllConfigurations(google.protobuf.StringValue) returns (ListResponse);
+
+  // Streams all the `Configuration` whose name matches the passed in StringValue.
+  // Use this (instead of the `GetAllConfigurations()) if you want the full contents
+  // of the configurations.
+  rpc StreamAllConfigurations(google.protobuf.StringValue) returns (stream Configuration);
+
   // Retrieves a Configuration by its ID.
-  rpc GetConfiguration(GetRequest) returns (Configuration);
+  rpc GetConfiguration(google.protobuf.StringValue) returns (Configuration);
 
   // Creates a new FSM, using the Configuration identified by `config_id`.
   // The FSM itself is immutable, only its `state` can be mutated by processing Events.
-  rpc PutFiniteStateMachine(FiniteStateMachine) returns (PutResponse);
+  rpc PutFiniteStateMachine(PutFsmRequest) returns (PutResponse);
 
   // Retrieves an FSM by its ID.
-  rpc GetFiniteStateMachine(GetRequest) returns (FiniteStateMachine);
+  rpc GetFiniteStateMachine(google.protobuf.StringValue) returns (FiniteStateMachine);
+
+  // Looks up all the FSMs, with the given `config_name` that are in the given `state`
+  // and returns their IDs.
+  rpc GetAllInState(GetAllFsmRequest) returns (ListResponse);
+
+  // Streams the full contents of the `FiniteStateMachine` that match the request,
+  // including their `id`.
+  //
+  // For this method call, the `state` may optionally be empty, all the FSMs that match
+  // the configuration name will be returned.
+  //
+  // The server may optionally choose not to implement this feature, and return an
+  // `InvalidRequest` if `state` is empty.
+  rpc StreamAllInstate(GetAllFsmRequest) returns (stream PutResponse);
 
   // Process an Event for an FSM, identified by `dest`.
-  // As events are processed asynchronously, the `event_id` is returned, which can be used
-  // to correlate the outcome of the event processing.
-  // In the EventResponse, the `outcome` is unlikely to have been filled in; use the `event_id`
-  // to query the outcome of the event processing by using `GetEventOutcome`.
+  //
+  // If events are processed asynchronously, the `outcome` will be empty, but
+  // the returned `event_id` can be used later on to query the outcome of the
+  // event processing (see `GetEventOutcome`).
   rpc ProcessEvent(EventRequest) returns (EventResponse);
 
   // Get the outcome of an event processing, identified by the `event_id` returned by `ProcessEvent`.
-  rpc GetEventOutcome(GetRequest) returns (EventResponse);
+  rpc GetEventOutcome(google.protobuf.StringValue) returns (EventResponse);
 }

@@ -9,8 +9,8 @@ set -eu
 workdir=$(dirname $0)
 
 
-version=$(grep -E '^[[:blank:]]*version' ${workdir}/build.settings |\
-    sed -E 's/^[[:blank:]]*version[[:blank:]]*=?[[:blank:]]*//' |\
-    sed "s/'//g" | sed 's/[[:blank:]]*$//')
+version=$(grep -E '^package[[:blank:]]' ${workdir}/api/statemachine.proto |\
+    sed -E 's/^package[[:blank:]]statemachine\.//' |\
+    sed "s/[[:blank:]]*;//g" | sed 's/[[:blank:]]*$//')
 
-echo "v${version}-g$(git rev-parse --short HEAD)"
+echo "${version}"
