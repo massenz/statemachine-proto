@@ -111,10 +111,28 @@ message FiniteStateMachine {
 
 // --------------- Service API ---------------
 
-// An `Event` for an FSM, uniquely identified by the `dest` ID
+// An `Event` for an FSM.
+//
+// The target statemachine is uniquely identified by the `id` and namespaced by the `config`.
+//
+// This can be also used to request the outcome of the Event,
+// (an `EventOutcome`) by leaving `event` empty and using the `id` as the `event_id`
+// returned in the `EventResponse`.
 message EventRequest {
   Event event = 1;
-  string dest = 2;
+  string config = 2;
+  string id = 3;
+}
+
+// Used to communicate back the `event_id` for the processed Event; it will be the
+// Event's `event_id` passed in the `EventRequest` (if one was provided) or a newly
+// generated one (typically, a UUID) if none was provided.
+//
+// The `event_id` can be used to correlate the outcome of the event processing (which
+// is asynchronous).
+message EventResponse {
+  string event_id = 1;
+  EventOutcome outcome = 2;
 }
 
 // An `EventOutcome` describes what happened when the Event was processed by the
@@ -136,23 +154,32 @@ message EventOutcome {
   // has been successfully processed (in which case the `details` field will be empty).
   StatusCode code = 1;
 
-  // The ID of the FSM for which the event was processed.
-  string dest = 3;
+  // The ID of the FSM for which the event was processed, namespaced by its configuration.
+  string id = 3;
+  string config = 4;
 
   // If anything other than `Ok` is returned, this field will contain a human-readable description
   // of the error, if available.
   string details = 2;
 }
 
-// Used to communicate back the `event_id` for the processed Event; it will be the
-// Event's `event_id` passed in the `EventRequest` (if one was provided) or a newly
-// generated one (typically, a UUID) if none was provided.
+// Used to retrieve either an individual FSM (by its `id`) or
+// the set of FSMs, in a given `state`.
 //
-// The `event_id` can be used to correlate the outcome of the event processing (which
-// is asynchronous).
-message EventResponse {
-  string event_id = 1;
-  EventOutcome outcome = 2;
+// Either way, FSMs are namespaced by their Configuration `name`,
+// but without specifying the `version`.
+message GetFsmRequest {
+  // The "type" of FSM, identified by the configuration name
+  string config = 1;
+
+  // One or the other MUST be specified when looking up FSMs,
+  // but both cannot be specified at the same time.
+  oneof query {
+    // Used if retrieving a single statemachine: the `id` to lookup
+    string id = 2;
+    // If retrieving a number of statemachines: their collective state
+    string state = 3;
+  }
 }
 
 // Request to create (or update) a `Statemachine`.
@@ -185,11 +212,6 @@ message ListResponse {
   repeated string ids = 1;
 }
 
-message GetAllFsmRequest {
-  google.protobuf.StringValue config = 1;
-  google.protobuf.StringValue state = 2;
-}
-
 service StatemachineService {
   // Creates an immutable Configuration, which can then be used to create FSMs whose
   // state transitions are defined in the configuration.
@@ -219,12 +241,12 @@ service StatemachineService {
   // The FSM itself is immutable, only its `state` can be mutated by processing Events.
   rpc PutFiniteStateMachine(PutFsmRequest) returns (PutResponse);
 
-  // Retrieves an FSM by its ID.
-  rpc GetFiniteStateMachine(google.protobuf.StringValue) returns (FiniteStateMachine);
+  // Retrieves an FSM by its Configuration `name` and Statemachine `ID`.
+  rpc GetFiniteStateMachine(GetFsmRequest) returns (FiniteStateMachine);
 
   // Looks up all the FSMs, with the given `config_name` that are in the given `state`
   // and returns their IDs.
-  rpc GetAllInState(GetAllFsmRequest) returns (ListResponse);
+  rpc GetAllInState(GetFsmRequest) returns (ListResponse);
 
   // Streams the full contents of the `FiniteStateMachine` that match the request,
   // including their `id`.
@@ -234,15 +256,15 @@ service StatemachineService {
   //
   // The server may optionally choose not to implement this feature, and return an
   // `InvalidRequest` if `state` is empty.
-  rpc StreamAllInstate(GetAllFsmRequest) returns (stream PutResponse);
+  rpc StreamAllInstate(GetFsmRequest) returns (stream PutResponse);
 
-  // Process an Event for an FSM, identified by `dest`.
+  // Process an Event for an FSM, identified by `id`.
   //
-  // If events are processed asynchronously, the `outcome` will be empty, but
+  // Events are processed asynchronously; the `outcome` will be empty, but
   // the returned `event_id` can be used later on to query the outcome of the
   // event processing (see `GetEventOutcome`).
-  rpc ProcessEvent(EventRequest) returns (EventResponse);
+  rpc SendEvent(EventRequest) returns (EventResponse);
 
   // Get the outcome of an event processing, identified by the `event_id` returned by `ProcessEvent`.
-  rpc GetEventOutcome(google.protobuf.StringValue) returns (EventResponse);
+  rpc GetEventOutcome(EventRequest) returns (EventResponse);
 }
