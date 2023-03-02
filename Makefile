@@ -5,7 +5,7 @@
 
 go-dir := golang
 version := 1.2.0
-release := $(version)-g$(shell git rev-parse --short HEAD)
+release := v$(version)-g$(shell git rev-parse --short HEAD)
 
 ##@ General
 
