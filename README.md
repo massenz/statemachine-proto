@@ -105,3 +105,160 @@ func main() {
 ```
 
 see the [Go Statemachine project](https://github.com/massenz/go-statemachine) for an example of how to use the generated code.
+
+# gRPC API
+
+> For a full description and documentation of the gRPC API, please see the [Protocol Buffer definition](api/statemachine.proto).
+
+These are the methods that are currently defined (as of version `v1beta` of the API, release `v1.1.0-beta-g1fc5dd8`) of the `statemachine-proto` repository.
+
+> **NOTE**
+>
+> It appears that it is currently not possible to export a Postman Collection containing gRPC method calls; we are looking into ways to share example method calls.
+
+
+#### Creation methods
+
+```
+  // Creates an immutable Configuration.
+  rpc PutConfiguration(Configuration) returns (PutResponse);
+
+  // Creates a new FSM, using the Configuration identified by `config_id`.
+  rpc PutFiniteStateMachine(PutFsmRequest) returns (PutResponse);
+```
+
+Examples:
+
+1. Creating a Configuration
+
+```
+{
+    "name": "test.orders",
+    "version": "v3",
+    "starting_state": "start",
+    "states": ["start", "stop"],
+    "transitions": [
+        {"event": "run", "from": "start", "to": "stop"}
+    ]
+}
+```
+
+2. Create a FiniteStateMachine
+
+```
+{
+    "id": "12345",
+    "fsm": {"config_id": "test.orders:v4"}
+}
+```
+
+3. Create a FiniteStateMachine omitting the ID, specifying the starting state
+
+```
+PutFiniteStateMachine
+
+{
+    "fsm": {
+        "config_id": "test.orders:v2",
+        "state": "shipped"
+    }
+}
+```
+response:
+```
+Status code: 0 (OK)
+
+{
+    "id": "b71e000e-3463-4ca9-8719-9bc74e75c173",
+    "fsm": {
+        "history": [],
+        "config_id": "test.orders:v2",
+        "state": "shipped"
+    }
+}
+```
+
+#### Lookup methods
+
+```
+  // Retrieves all Configuration names, or versions.
+  rpc GetAllConfigurations(google.protobuf.StringValue) returns (ListResponse);
+
+  // Retrieves a Configuration by its ID.
+  rpc GetConfiguration(google.protobuf.StringValue) returns (Configuration);
+
+  // Retrieves an FSM by its Configuration `name` and Statemachine `ID`.
+  rpc GetFiniteStateMachine(GetFsmRequest) returns (FiniteStateMachine);
+
+  // Looks up all the FSMs in the given `state`
+  rpc GetAllInState(GetFsmRequest) returns (ListResponse);
+```
+
+Examples:
+
+1. To get all FSMs in the `shipped` state:
+
+```
+GetAllInState
+{
+    "config": "test.orders",
+    "state": "shipped"
+}
+```
+```
+Status Code: 0 (OK)
+{
+    "ids": [
+        "b71e000e-3463-4ca9-8719-9bc74e75c173"
+    ]
+}
+```
+
+2. To find all configurations available in the store use the `GetAllConfigurations` with an empty request. The response will have all configuration names:
+
+```
+Status Code: 0 (OK)
+{
+    "ids": [
+        "returns",
+        "users",
+        "devices",
+        "test.orders"
+    ]
+}
+```
+and then to retrieve all versions, pass in the `name` of the configuration:
+
+```
+GetAllConfigurations
+{"value": "test.orders"}
+```
+```
+Status Code: 0 (OK)
+{
+    "ids": [
+        "test.orders:v1",
+        "test.orders:v2"
+    ]
+}
+```
+
+#### Streaming methods
+
+```
+  // Streams all the `Configuration` whose name matches the passed in StringValue.
+  rpc StreamAllConfigurations(google.protobuf.StringValue) returns (stream Configuration);
+
+  // Streams the full contents of `FiniteStateMachines` in the given `state`
+  rpc StreamAllInstate(GetFsmRequest) returns (stream PutResponse);
+```
+
+#### Event Management
+
+```
+  // Process an Event for an FSM, identified by `id`.
+  rpc SendEvent(EventRequest) returns (EventResponse);
+
+  // Get the outcome of an event processing, identified by the `event_id` returned by `ProcessEvent`.
+  rpc GetEventOutcome(EventRequest) returns (EventResponse);
+```

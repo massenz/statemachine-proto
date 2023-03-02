@@ -8,6 +8,7 @@ package statemachine.v1beta;
 
 import "google/protobuf/timestamp.proto";
 import "google/protobuf/wrappers.proto";
+import "google/protobuf/empty.proto";
 
 // This is the Go import package; there is no correlation with the proto `package` above.
 //
@@ -212,7 +213,21 @@ message ListResponse {
   repeated string ids = 1;
 }
 
+// Healthcheck response, returns the state of the server
+// and whether it is ready to accept incoming requests.
+message HealthResponse {
+  enum ReadyState {
+    READY = 0;
+    NOT_READY = 1;
+  }
+  ReadyState state = 1;
+  string release = 2;
+  bool tlsEnabled = 3;
+}
+
 service StatemachineService {
+  // Healthcheck for the server
+  rpc Health(google.protobuf.Empty) returns (HealthResponse);
   // Creates an immutable Configuration, which can then be used to create FSMs whose
   // state transitions are defined in the configuration.
   // `Configuration`s are immutable and cannot be modified once created: attempting

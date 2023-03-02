@@ -3,7 +3,9 @@
 #
 # Author: Marco Massenzio (marco@alertavert.com)
 
-go-dir=golang
+go-dir := golang
+version := 1.2.0
+release := $(version)-g$(shell git rev-parse --short HEAD)
 
 ##@ General
 
@@ -17,6 +19,11 @@ go-dir=golang
 help: ## Display this help.
 	@awk 'BEGIN {FS = ":.*##"; printf "\nUsage:\n  make \033[36m<target>\033[0m\n"} /^[a-zA-Z_0-9-]+:.*?##/ { printf "  \033[36m%-15s\033[0m %s\n", $$1, $$2 } /^##@/ { printf "\n\033[1m%s\033[0m\n", substr($$0, 5) } ' $(MAKEFILE_LIST)
 
+version:
+	@echo $(version)
+
+release:
+	@echo $(release)
 
 ##@ Golang
 
@@ -30,7 +37,6 @@ $(go-dir)/api/statemachine_grpc.pb.go: api/statemachine.proto
          api/*.proto
 
 protos: $(go-dir)/api/statemachine.pb.go $(go-dir)/api/statemachine_grpc.pb.go  ## Generates Golang Protobuf bindings
-
 
 $(go-dir)/go.mod:
 	@mkdir -p $(go-dir)
