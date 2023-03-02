@@ -36,13 +36,10 @@ jobs:
           git config user.name "$AUTHOR"
           git config user.email "<$EMAIL>"
 
-      - name: Generate commit tag
-        run: |
-          TAG=$(./get-tag)
-          echo TAG=${TAG} >> $GITHUB_ENV
-
       - name: Commit generated code
         run:
+          TAG=$(make release)
+          echo TAG=${TAG} >> $GITHUB_ENV
           git add . && git commit -am "Protos updated to Rev. ${{ env.TAG }}" || true
           git push origin
 
